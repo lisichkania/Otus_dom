@@ -364,15 +364,15 @@ postgres=# SELECT relname, n_live_tup, n_dead_tup, trunc(100*n_dead_tup/(n_live_
 ```
 ## 5 раз обновить все строчки и добавить к каждой строчке любой символ
 ```
-postgres=# update test5 set test = 'noname1';
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
-postgres=# update test5 set test = 'noname12';
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
-postgres=# update test5 set test = 'noname123';
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
-postgres=# update test5 set test = 'noname1234';
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
-postgres=# update test5 set test = 'noname12345';
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
 ```
 ## Посмотреть количество мертвых строчек в таблице и когда последний раз приходил автовакуум
@@ -399,15 +399,15 @@ postgres=# SELECT pg_size_pretty(pg_TABLE_size('test5'));
 ```
 ## 5 раз обновить все строчки и добавить к каждой строчке любой символ
 ```
-postgres=# update test5 set test = 'noname123456';
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
-postgres=# update test5 set test = 'noname1234567';
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
-postgres=# update test5 set test = 'noname12345678';
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
-postgres=# update test5 set test = 'noname123456789';
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
-postgres=# update test5 set test = 'noname1234567890';
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
 ```
 ## Посмотреть размер файла с таблицей
@@ -430,36 +430,25 @@ ALTER TABLE
 ```
 ## 10 раз обновить все строчки и добавить к каждой строчке любой символ
 ```
-postgres=# update test5
-set test = CONCAT(test, 'x');
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
-postgres=# update test5
-set test = CONCAT(test, 'x');
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
-postgres=# update test5
-set test = CONCAT(test, 'x');
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
-postgres=#
-postgres=# update test5
-set test = CONCAT(test, 'x');
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
-postgres=# update test5
-set test = CONCAT(test, 'x');
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
-postgres=# update test5
-set test = CONCAT(test, 'x');
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
-postgres=# update test5
-set test = CONCAT(test, 'x');
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
-postgres=# update test5
-set test = CONCAT(test, 'x');
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
-postgres=# update test5
-set test = CONCAT(test, 'x');
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
-postgres=# update test5
-set test = CONCAT(test, 'x');
+postgres=# update test5 set test = CONCAT(test, 'x');
 UPDATE 1000000
 ```
 ## Посмотреть размер файла с таблицей
@@ -477,7 +466,50 @@ postgres=# SELECT pg_size_pretty(pg_TABLE_size('test5'));
 Не забудьте включить автовакуум)
 ## Задание со *:
 ### Написать анонимную процедуру, в которой в цикле 10 раз обновятся все строчки в искомой таблице.
+*Создаем процедуру, указываем язык, объявляем переменную step равную 1, задаём while пока наш шаг не достигнет 10 выполнять цикл с выводом шага, обновляем в таблице поле с добавлением символа, увеличиваем шаг на 1 и закрываем цикл, а так же процедуру. Вызываем процедуру и проверяем объем таблицы, а так же срабатывание автовакуума, через несколько секунд он сработал.
 ```
+postgres=# CREATE PROCEDURE test5_otus()
+LANGUAGE plpgsql
+AS $$
+DECLARE step int :=1;
+ BEGIN
+  WHILE step <= 10
+   LOOP
+    RAISE NOTICE 'step %', step;
+    UPDATE test5 SET test = CONCAT(test, 'x');
+    step = step + 1;
+   END LOOP;
+ END;
+$$;
+CREATE PROCEDURE
+postgres=# CALL test5_otus();
+NOTICE:  step 1
+NOTICE:  step 2
+NOTICE:  step 3
+NOTICE:  step 4
+NOTICE:  step 5
+NOTICE:  step 6
+NOTICE:  step 7
+NOTICE:  step 8
+NOTICE:  step 9
+NOTICE:  step 10
+CALL
+postgres=# SELECT pg_size_pretty(pg_TABLE_size('test5'));
+ pg_size_pretty
+----------------
+ 570 MB
+(1 row)
 
+postgres=# SELECT relname, n_live_tup, n_dead_tup, trunc(100*n_dead_tup/(n_live_tup+1))::float "ratio%", last_autovacuum FROM pg_stat_user_TABLEs  WHERE relname = 'test5';
+ relname | n_live_tup | n_dead_tup | ratio% |        last_autovacuum
+---------+------------+------------+--------+-------------------------------
+ test5   |    1001532 |   10000000 |    998 | 2024-03-08 02:29:11.652285+00
+(1 row)
+
+postgres=# SELECT relname, n_live_tup, n_dead_tup, trunc(100*n_dead_tup/(n_live_tup+1))::float "ratio%", last_autovacuum FROM pg_stat_user_TABLEs  WHERE relname = 'test5';
+ relname | n_live_tup | n_dead_tup | ratio% |        last_autovacuum
+---------+------------+------------+--------+-------------------------------
+ test5   |    1000000 |          0 |      0 | 2024-03-08 13:20:32.993324+00
+(1 row)
 ```
 Не забыть вывести номер шага цикла.
